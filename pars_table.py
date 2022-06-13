@@ -1,3 +1,5 @@
+from logging.handlers import RotatingFileHandler
+
 from googleapiclient import discovery
 from google.oauth2 import service_account
 import requests
@@ -10,8 +12,27 @@ import json
 import openpyxl
 import warnings
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+log_dir = os.path.join(BASE_DIR, 'logs/')
+log_file = os.path.join(BASE_DIR, 'logs/pars_table.log')
+console_handler = logging.StreamHandler()
+file_handler = RotatingFileHandler(
+    log_file,
+    maxBytes=100000,
+    backupCount=3,
+    encoding='utf-8'
+)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s, %(levelname)s, %(message)s',
+    handlers=(
+        file_handler,
+        console_handler
+    )
+)
+
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 CREDENTIALS_FILE = 'credentials_service.json'
 credentials = service_account.Credentials.from_service_account_file(CREDENTIALS_FILE)
@@ -65,8 +86,7 @@ def convert_to_column_letter(column_number):
 
 
 def update_table_count_fbo(day, month, year, table_id, dict_count):
-    print(dict_count)
-    print(sum(dict_count.values()))
+    global report_article
     range_name = f'{month}.{year}'
     position_for_place = START_POSITION_FOR_PLACE + (int(day) - 1) * 6
 
@@ -99,9 +119,10 @@ def update_table_count_fbo(day, month, year, table_id, dict_count):
                 body = {
                     'valueInputOption': 'USER_ENTERED',
                     'data': body_data}
+                global report_article
+                if len(dict_count) > 0:
+                    report_article = dict_count
     sheet.values().batchUpdate(spreadsheetId=table_id, body=body).execute()
-    print(dict_count)
-    print(sum(dict_count.values()))
 
 
 if __name__ == '__main__':
@@ -114,9 +135,17 @@ if __name__ == '__main__':
     with open(cred_file, 'r', encoding="utf-8") as f:
         cred = json.load(f)
         for i in cred:
-            table_id = cred[i].get('table_id')
-            with warnings.catch_warnings(record=True):
-                warnings.simplefilter("always")
-                excel_file = openpyxl.load_workbook(f'excel_docs/{i}-{dt.datetime.date(dt.datetime.now())}')
-            employees_sheet = excel_file['Sheet1']
-            update_table_count_fbo(day, month, year, table_id, dict_article_count(employees_sheet))
+            if i != 'Савельева':
+                table_id = cred[i].get('table_id')
+                with warnings.catch_warnings(record=True):
+                    warnings.simplefilter("always")
+                    excel_file = openpyxl.load_workbook(f'excel_docs/{i}-{dt.datetime.date(dt.datetime.now())}.xlsx')
+                employees_sheet = excel_file['Sheet1']
+                update_table_count_fbo(day, month, year, table_id, dict_article_count(employees_sheet))
+                if i == 'Кулик':
+                   table_id = cred[i].get('table_id_december')
+                with warnings.catch_warnings(record=True):
+                    warnings.simplefilter("always")
+                    excel_file = openpyxl.load_workbook(f'excel_docs/{i}-{dt.datetime.date(dt.datetime.now())}.xlsx')
+                employees_sheet = excel_file['Sheet1']
+                update_table_count_fbo(day, month, year, table_id, dict_article_count(employees_sheet))
